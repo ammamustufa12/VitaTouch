@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_health_monitor/main.dart';
 import 'package:smart_health_monitor/screens/home/scan_station.dart';
 import 'package:smart_health_monitor/screens/scanning/scanning_screen.dart';
+import 'package:smart_health_monitor/screens/splash/splash_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -12,11 +13,24 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('splash opens the home dashboard', (tester) async {
+  testWidgets('the app opens on an empty touch screen', (tester) async {
     final preferences = await SharedPreferences.getInstance();
     await tester.pumpWidget(await buildSmartHealthApp(preferences: preferences));
+    await tester.pump();
 
-    expect(find.text('Smart Health Monitor'), findsOneWidget);
+    expect(find.text('Touch. Check. Care.'), findsOneWidget);
+    expect(find.text('LOADING'), findsNothing);
+    expect(find.text('Touch to load'), findsNothing);
+  });
+
+  testWidgets('home dashboard still opens from the shell', (tester) async {
+    final preferences = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      await buildSmartHealthApp(
+        preferences: preferences,
+        home: const SplashScreen(),
+      ),
+    );
 
     await tester.pump(const Duration(milliseconds: 1700));
     await tester.pump(const Duration(milliseconds: 500));

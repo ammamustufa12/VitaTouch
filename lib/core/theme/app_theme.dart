@@ -15,6 +15,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: 'Plus Jakarta Sans',
       colorScheme: scheme,
       scaffoldBackgroundColor: AppColors.mist,
       splashFactory: InkSparkle.splashFactory,
@@ -58,6 +59,7 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
+          fontFamily: 'Plus Jakarta Sans',
           color: AppColors.navy,
           fontSize: 20,
           fontWeight: FontWeight.w700,

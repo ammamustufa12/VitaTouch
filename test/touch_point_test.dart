@@ -23,10 +23,14 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Place 1 to 5 fingers'), findsOneWidget);
-    expect(_opacity(tester, find.text('Heart Rate')), 0);
+    expect(find.text('Touch. Check. Care.'), findsOneWidget);
+    expect(find.text('Place 1 to 5 fingers'), findsNothing);
+    expect(find.text('LOADING'), findsNothing);
+    expect(find.text('Heart Rate'), findsNothing);
 
-    final touch = tester.getCenter(find.byKey(TouchPointScreen.circleKey));
+    expect(find.byKey(TouchPointScreen.circleKey), findsNothing);
+
+    const touch = Offset(480, 360);
     final fingers = <TestGesture>[];
     const tones = [
       Color(0xFF3DDC84),
@@ -38,16 +42,18 @@ void main() {
     for (var count = 1; count <= 5; count++) {
       fingers.add(await tester.startGesture(touch.translate(count * 28, count * 12)));
       await tester.pump();
-      expect(find.text('$count finger${count == 1 ? '' : 's'}'), findsOneWidget);
+      expect(find.byKey(TouchPointScreen.circleKey), findsOneWidget);
+      expect(find.text('LOADING'), findsNothing);
+      expect(find.text('$count finger${count == 1 ? '' : 's'}'), findsNothing);
       expect(find.text('Green'), findsNothing);
       expect(find.text('Blue'), findsNothing);
       expect(_cardIcon(tester), tones[count - 1]);
     }
 
-    final before = _offset(tester, find.text('LOADING'));
+    final before = _offset(tester, find.byKey(TouchPointScreen.circleKey));
     await fingers.first.moveBy(const Offset(80, -30));
     await tester.pump();
-    final moved = _offset(tester, find.text('LOADING')) - before;
+    final moved = _offset(tester, find.byKey(TouchPointScreen.circleKey)) - before;
     expect(moved.dx, greaterThan(20));
     expect(moved.dy, lessThan(-8));
     await tester.pump(const Duration(milliseconds: 1500));
@@ -58,9 +64,9 @@ void main() {
       await tester.pump();
     }
 
-    expect(find.text('Place 1 to 5 fingers'), findsOneWidget);
-    expect(_opacity(tester, find.text('Heart Rate')), 0);
-    expect(_offset(tester, find.text('LOADING')), Offset.zero);
+    expect(find.text('Touch. Check. Care.'), findsOneWidget);
+    expect(find.byKey(TouchPointScreen.circleKey), findsNothing);
+    expect(find.text('Heart Rate'), findsNothing);
   });
 }
 

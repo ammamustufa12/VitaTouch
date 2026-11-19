@@ -6,7 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../../models/health_reading.dart';
 import '../../providers/health_provider.dart';
+import '../../providers/profile_provider.dart';
 import '../../services/sensor_service.dart';
+
+const _font = 'Plus Jakarta Sans';
 
 class TouchPointScreen extends StatefulWidget {
   const TouchPointScreen({super.key});
@@ -19,25 +22,12 @@ class TouchPointScreen extends StatefulWidget {
 
 class _TouchPointScreenState extends State<TouchPointScreen>
     with TickerProviderStateMixin {
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1600),
-  );
-  late final AnimationController _glow = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  )..repeat(reverse: true);
-  late final AnimationController _rise = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  );
-  late final AnimationController _count = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  );
+  late final AnimationController _pulse;
+  late final AnimationController _glow;
+  late final AnimationController _rise;
+  late final AnimationController _count;
 
   HealthReading? _reading;
-  String? _miss;
   bool _busy = false;
   int _generation = 0;
   final Set<int> _down = <int>{};
@@ -45,6 +35,34 @@ class _TouchPointScreenState extends State<TouchPointScreen>
   final Map<int, Offset> _origin = <int, Offset>{};
   int _fingers = 0;
   Offset _shift = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
+    _glow = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+    _rise = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    _count = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<HealthProvider>().initialize();
+      context.read<ProfileProvider>().initialize();
+    });
+  }
 
   @override
   void dispose() {
@@ -89,7 +107,6 @@ class _TouchPointScreenState extends State<TouchPointScreen>
     final generation = ++_generation;
     _busy = true;
     _syncLoader();
-    setState(() => _miss = null);
     try {
       final reading = await context.read<HealthProvider>().runScan(
             SensorCaptureRequest(
@@ -104,10 +121,7 @@ class _TouchPointScreenState extends State<TouchPointScreen>
     } on ScanCancelled {
       return;
     } catch (_) {
-      if (!mounted || generation != _generation) {
-        return;
-      }
-      setState(() => _miss = 'The reading did not load.');
+      return;
     } finally {
       _busy = false;
       _syncLoader();
@@ -207,6 +221,7 @@ class _TouchPointScreenState extends State<TouchPointScreen>
   Widget _board(Size size) {
     final tone = _tone(_fingers);
     final ring = math.min(size.width, size.height) * 0.48;
+    final live = _down.isNotEmpty;
     return SizedBox(
       width: size.width,
       height: size.height,
@@ -238,16 +253,19 @@ class _TouchPointScreenState extends State<TouchPointScreen>
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Center(
-                        child: Transform.translate(
-                          offset: _shift,
-                          child: _center(ring, tone),
+                      if (live)
+                        Center(
+                          child: Transform.translate(
+                            offset: _shift,
+                            child: _center(ring, tone),
+                          ),
                         ),
-                      ),
-                      Positioned(left: 8, top: 6, child: _heartCard(tone)),
-                      Positioned(right: 8, top: 6, child: _oxygenCard(tone)),
-                      Positioned(left: 8, bottom: 8, child: _tempCard(tone)),
-                      Positioned(right: 8, bottom: 8, child: _sugarCard(tone)),
+                      if (live) ...[
+                        Positioned(left: 8, top: 6, child: _heartCard(tone)),
+                        Positioned(right: 8, top: 6, child: _oxygenCard(tone)),
+                        Positioned(left: 8, bottom: 8, child: _tempCard(tone)),
+                        Positioned(right: 8, bottom: 8, child: _sugarCard(tone)),
+                      ],
                     ],
                   ),
                 ),
@@ -374,19 +392,23 @@ class _TouchPointScreenState extends State<TouchPointScreen>
                 ],
               ),
               style: TextStyle(
+                fontFamily: _font,
                 color: Colors.white,
-                fontSize: 26,
+                fontSize: 28,
                 fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
+                letterSpacing: -0.8,
+                height: 1.05,
               ),
             ),
-            SizedBox(height: 2),
+            SizedBox(height: 4),
             Text(
               'Touch. Check. Care.',
               style: TextStyle(
+                fontFamily: _font,
                 color: Color(0xFF8EA4BE),
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
+                letterSpacing: 0.2,
               ),
             ),
           ],
@@ -427,51 +449,21 @@ class _TouchPointScreenState extends State<TouchPointScreen>
           child: AnimatedBuilder(
             animation: _pulse,
             builder: (context, child) {
-              final fill = spinning ? 0.18 + (_pulse.value * 0.75) : 0.62;
               return CustomPaint(
                 painter: _GaugePainter(
                   turn: _pulse.value,
                   spinning: spinning,
                   color: tone,
                 ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: ring * 0.28,
-                      height: ring * 0.28,
-                      child: CustomPaint(painter: _FingerprintMark(color: tone)),
-                    ),
-                    SizedBox(height: ring * 0.03),
-                    const Text(
-                      'LOADING',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 3.2,
-                      ),
-                    ),
-                    SizedBox(height: ring * 0.04),
-                    _LoadBar(fill: fill, color: tone),
-                  ],
+                child: Center(
+                  child: SizedBox(
+                    width: ring * 0.34,
+                    height: ring * 0.34,
+                    child: CustomPaint(painter: _FingerprintMark(color: tone)),
+                  ),
                 ),
               );
             },
-          ),
-        ),
-        const SizedBox(height: 22),
-        Text(
-          _miss ??
-              (_fingers == 0
-                  ? 'Place 1 to 5 fingers'
-                  : _fingers == 1
-                      ? '1 finger'
-                      : '$_fingers fingers'),
-          style: TextStyle(
-            color: _miss == null ? Colors.white : const Color(0xFFFF8A80),
-            fontSize: 36,
-            fontWeight: FontWeight.w800,
           ),
         ),
       ],
@@ -508,41 +500,6 @@ class _TouchPointScreenState extends State<TouchPointScreen>
         );
       },
       child: group,
-    );
-  }
-}
-
-class _LoadBar extends StatelessWidget {
-  const _LoadBar({required this.fill, required this.color});
-
-  final double fill;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 132,
-      height: 8,
-      alignment: Alignment.centerLeft,
-      decoration: BoxDecoration(
-        color: const Color(0xFF14324C),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: FractionallySizedBox(
-        widthFactor: fill.clamp(0.08, 1),
-        heightFactor: 1,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: [color, Colors.white],
-            ),
-            boxShadow: const [
-              BoxShadow(color: Color(0xAA39D4FF), blurRadius: 8),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -634,9 +591,11 @@ class _MetricCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
+                    fontFamily: _font,
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
                   ),
                 ),
               ),
@@ -653,7 +612,8 @@ class _MetricCard extends StatelessWidget {
                     TextSpan(
                       text: ' $unit',
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontFamily: _font,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFFB7C7D9),
                       ),
@@ -661,10 +621,13 @@ class _MetricCard extends StatelessWidget {
                   ],
                 ),
                 style: TextStyle(
+                  fontFamily: _font,
                   color: tone,
-                  fontSize: 32,
+                  fontSize: 34,
                   fontWeight: FontWeight.w800,
+                  letterSpacing: -0.8,
                   height: 1,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               );
             },

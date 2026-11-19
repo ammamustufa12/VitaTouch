@@ -1,6 +1,6 @@
 # VitaTouch
 
-Touch health monitor for a Windows touch laptop. One to five fingers load the corner cards and change the color.
+Touch health monitor for a Windows touch laptop. The dashboard is already on screen. Touch anywhere and the loader and corner cards appear. One to five fingers change the color.
 
 ## Run without building
 
