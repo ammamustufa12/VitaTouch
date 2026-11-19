@@ -30,7 +30,7 @@ void main() {
 
     expect(find.byKey(TouchPointScreen.circleKey), findsNothing);
 
-    const touch = Offset(480, 360);
+    const touch = Offset(220, 520);
     final fingers = <TestGesture>[];
     const tones = [
       Color(0xFF3DDC84),
@@ -50,14 +50,33 @@ void main() {
       expect(_cardIcon(tester), tones[count - 1]);
     }
 
-    final before = _offset(tester, find.byKey(TouchPointScreen.circleKey));
+    final circleAtTouch = tester.getCenter(find.byKey(TouchPointScreen.circleKey));
+    expect((circleAtTouch - const Offset(248, 532)).distance, lessThan(20));
+
+    final beforeCircle = circleAtTouch;
+    final beforeCard = tester.getCenter(find.text('Heart Rate'));
     await fingers.first.moveBy(const Offset(80, -30));
     await tester.pump();
-    final moved = _offset(tester, find.byKey(TouchPointScreen.circleKey)) - before;
-    expect(moved.dx, greaterThan(20));
-    expect(moved.dy, lessThan(-8));
+    final circleMoved = tester.getCenter(find.byKey(TouchPointScreen.circleKey)) - beforeCircle;
+    final cardMoved = tester.getCenter(find.text('Heart Rate')) - beforeCard;
+    expect(circleMoved.dx, greaterThan(20));
+    expect(circleMoved.dy, lessThan(-8));
+    expect((cardMoved - circleMoved).distance, lessThan(2));
     await tester.pump(const Duration(milliseconds: 1500));
     expect(_opacity(tester, find.text('Heart Rate')), 1);
+    final circle = tester.getCenter(find.byKey(TouchPointScreen.circleKey));
+    final heart = tester.getCenter(find.text('Heart Rate'));
+    final oxygen = tester.getCenter(find.text('Blood Oxygen'));
+    final temp = tester.getCenter(find.text('Body Temperature'));
+    final sugar = tester.getCenter(find.text('Blood Sugar'));
+    expect(heart.dx, lessThan(circle.dx));
+    expect(heart.dy, lessThan(circle.dy));
+    expect(oxygen.dx, greaterThan(circle.dx));
+    expect(oxygen.dy, lessThan(circle.dy));
+    expect(temp.dx, lessThan(circle.dx));
+    expect(temp.dy, greaterThan(circle.dy));
+    expect(sugar.dx, greaterThan(circle.dx));
+    expect(sugar.dy, greaterThan(circle.dy));
 
     for (final finger in fingers.reversed) {
       await finger.up();
@@ -68,12 +87,6 @@ void main() {
     expect(find.byKey(TouchPointScreen.circleKey), findsNothing);
     expect(find.text('Heart Rate'), findsNothing);
   });
-}
-
-Offset _offset(WidgetTester tester, Finder target) {
-  final finder = find.ancestor(of: target, matching: find.byType(Transform)).first;
-  final translation = tester.widget<Transform>(finder).transform.getTranslation();
-  return Offset(translation.x, translation.y);
 }
 
 double _opacity(WidgetTester tester, Finder target) {

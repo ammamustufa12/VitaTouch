@@ -34,7 +34,8 @@ class _TouchPointScreenState extends State<TouchPointScreen>
   final Set<int> _sensor = <int>{};
   final Map<int, Offset> _origin = <int, Offset>{};
   int _fingers = 0;
-  Offset _shift = Offset.zero;
+  Offset _focus = Offset.zero;
+  final GlobalKey _stageKey = GlobalKey();
 
   @override
   void initState() {
@@ -128,10 +129,22 @@ class _TouchPointScreenState extends State<TouchPointScreen>
     }
   }
 
+  Offset? _stagePoint(Offset global) {
+    final box = _stageKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached || !box.hasSize) {
+      return null;
+    }
+    return box.globalToLocal(global);
+  }
+
   void _pointerDown(PointerDownEvent event) {
     final first = _down.isEmpty;
+    final point = _stagePoint(event.position);
+    if (first && point != null) {
+      _focus = point;
+    }
     _down.add(event.pointer);
-    _origin[event.pointer] = event.localPosition - _shift;
+    _origin[event.pointer] = (point ?? _focus) - _focus;
     _setFingers(_down.length);
     if (first) {
       _load();
@@ -144,10 +157,11 @@ class _TouchPointScreenState extends State<TouchPointScreen>
 
   void _pointerMove(PointerMoveEvent event) {
     final origin = _origin[event.pointer];
-    if (origin == null) {
+    final point = _stagePoint(event.position);
+    if (origin == null || point == null) {
       return;
     }
-    setState(() => _shift = event.localPosition - origin);
+    setState(() => _focus = point - origin);
   }
 
   void _pointerUp(PointerEvent event) {
@@ -160,7 +174,7 @@ class _TouchPointScreenState extends State<TouchPointScreen>
       _rise.value = 0;
       _count.stop();
       _count.value = 0;
-      _shift = Offset.zero;
+      _focus = Offset.zero;
     }
     _setFingers(_down.length);
   }
@@ -250,23 +264,30 @@ class _TouchPointScreenState extends State<TouchPointScreen>
               children: [
                 _header(),
                 Expanded(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      if (live)
-                        Center(
-                          child: Transform.translate(
-                            offset: _shift,
-                            child: _center(ring, tone),
-                          ),
-                        ),
-                      if (live) ...[
-                        Positioned(left: 8, top: 6, child: _heartCard(tone)),
-                        Positioned(right: 8, top: 6, child: _oxygenCard(tone)),
-                        Positioned(left: 8, bottom: 8, child: _tempCard(tone)),
-                        Positioned(right: 8, bottom: 8, child: _sugarCard(tone)),
-                      ],
-                    ],
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stage = constraints.biggest;
+                      final shift = _focus - Offset(stage.width / 2, stage.height / 2);
+                      return Stack(
+                        key: _stageKey,
+                        clipBehavior: Clip.none,
+                        children: [
+                          if (live)
+                            Center(
+                              child: Transform.translate(
+                                offset: shift,
+                                child: _center(ring, tone),
+                              ),
+                            ),
+                          if (live) ...[
+                            Positioned(left: 8, top: 6, child: _heartCard(tone, shift)),
+                            Positioned(right: 8, top: 6, child: _oxygenCard(tone, shift)),
+                            Positioned(left: 8, bottom: 8, child: _tempCard(tone, shift)),
+                            Positioned(right: 8, bottom: 8, child: _sugarCard(tone, shift)),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],
@@ -277,9 +298,10 @@ class _TouchPointScreenState extends State<TouchPointScreen>
     );
   }
 
-  Widget _heartCard(Color tone) {
+  Widget _heartCard(Color tone, Offset shift) {
     return _corner(
       tone: tone,
+      shift: shift,
       orbOnLeft: true,
       card: _MetricCard(
         title: 'Heart Rate',
@@ -295,9 +317,10 @@ class _TouchPointScreenState extends State<TouchPointScreen>
     );
   }
 
-  Widget _oxygenCard(Color tone) {
+  Widget _oxygenCard(Color tone, Offset shift) {
     return _corner(
       tone: tone,
+      shift: shift,
       orbOnLeft: false,
       card: _MetricCard(
         title: 'Blood Oxygen',
@@ -313,9 +336,10 @@ class _TouchPointScreenState extends State<TouchPointScreen>
     );
   }
 
-  Widget _tempCard(Color tone) {
+  Widget _tempCard(Color tone, Offset shift) {
     return _corner(
       tone: tone,
+      shift: shift,
       orbOnLeft: true,
       card: _MetricCard(
         title: 'Body Temperature',
@@ -331,9 +355,10 @@ class _TouchPointScreenState extends State<TouchPointScreen>
     );
   }
 
-  Widget _sugarCard(Color tone) {
+  Widget _sugarCard(Color tone, Offset shift) {
     return _corner(
       tone: tone,
+      shift: shift,
       orbOnLeft: false,
       card: _MetricCard(
         title: 'Blood Sugar',
@@ -472,6 +497,7 @@ class _TouchPointScreenState extends State<TouchPointScreen>
 
   Widget _corner({
     required Color tone,
+    required Offset shift,
     required bool orbOnLeft,
     required Widget card,
   }) {
@@ -494,7 +520,7 @@ class _TouchPointScreenState extends State<TouchPointScreen>
         return Opacity(
           opacity: (rise * 2.2).clamp(0.0, 1.0),
           child: Transform.translate(
-            offset: Offset(_shift.dx, (1 - rise) * 260 + _shift.dy),
+            offset: Offset(shift.dx, (1 - rise) * 260 + shift.dy),
             child: child,
           ),
         );
